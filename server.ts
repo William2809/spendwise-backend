@@ -20,6 +20,9 @@ app.all('*', (req: any, res, next) => {
 //User routes
 app.use('/api/users', require('./routes/userRoutes'));
 
+//Transaction routes
+app.use('/api/transactions', require('./routes/transactionRoutes'));
+
 app.get('/', (req, res) => {
     res.status(200).json({ message: "Welcome to SpendWise api" });
 })
