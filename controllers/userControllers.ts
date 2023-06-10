@@ -25,6 +25,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     if (user && (await bcrypt.compare(password as string, user.password as string))) {
         res.status(200).json({
             _id: user._id,
+            name: user.name,
             email: user.email,
             picture: user.picture,
             token: generateToken(user._id),

@@ -65,7 +65,17 @@ const classifyTransaction = asyncHandler(async (req: Request, res: Response) => 
       messages: [
         {
           role: "system",
-          content: `We have a list of categories: ${categories.join(", ")}.`
+          content: ` 
+          You are an intelligent assistant that classifies expenses into categories. Here are some rules to guide your responses:
+
+          1. We have a list of categories: ${categories.join(", ")}.
+
+          2. If the user's message does not contain enough information for an expense or is not related to an expense, fill it in as "Unknown" or make an educated guess based on the available information(for the following fields: Name, Category, Item) -> very important.
+
+          3. If the input could potentially fall into multiple categories, make an educated guess based on the information available.
+          
+          4. If the input doesn't provide a valid amount spent, fill it in as "Unknown" or "0".
+          `
         },
         {
           role: "user",
@@ -73,7 +83,9 @@ const classifyTransaction = asyncHandler(async (req: Request, res: Response) => 
         },
         {
           role: "assistant",
-          content: `Please classify the expense into one of the categories and generate a JSON object with the following fields: \n1. name (the name of the establishment)\n2. item (the item purchased)\n3. category (the best fitting category from the list)\n4. amount (the amount spent)\n\nJSON:`
+          content: `
+
+          Please classify the expense into one of the categories and generate a JSON object with the following fields (Use capitalize format): \n1. name (2 words or more of summarization with clear action context of the text, if it is not about expenses or spending, fill it as "Unknown")\n2. item (the item purchased)\n3. category (the best fitting category from the list)\n4. amount (the amount spent)\n\nJSON:`
         }
       ],
       temperature: 0.3,
