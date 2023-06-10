@@ -85,7 +85,7 @@ const classifyTransaction = asyncHandler(async (req: Request, res: Response) => 
           role: "assistant",
           content: `
 
-          Please classify the expense into one of the categories and generate a JSON object with the following fields (Use capitalize format): \n1. name (2 words or more of summarization with clear action context of the text, if it is not about expenses or spending, fill it as "Unknown")\n2. item (the item purchased)\n3. category (the best fitting category from the list)\n4. amount (the amount spent)\n\nJSON:`
+          Please classify the expense into one of the categories and generate a JSON object with the following fields (Use capitalize format): \n1. name (2 words or more of summarization with clear action context of the text, if it is not about expenses or spending, fill it as "Unknown")\n2. item (the item purchased)\n3. category (the best fitting category from the list)\n4. amount (the amount spent, just number do not include currency character )\n\nJSON:`
         }
       ],
       temperature: 0.3,
