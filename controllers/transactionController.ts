@@ -134,9 +134,33 @@ const deleteTransaction = asyncHandler(async (req: Request, res: Response) => {
 	}
 });
 
+// Desc: edit a transaction
+// Route : /api/transactions/edit
+// access : private
+const editTransaction = asyncHandler(async (req: Request, res: Response) => {
+	const { _id, name, item, category, amount } = req.body;
+	// edit transaction
+	const transaction = await Transaction.findById(_id);
+
+	if (!transaction) {
+		res.status(404);
+		throw new Error("Transaction not found");
+	}
+
+	transaction.name = name;
+	transaction.item = item;
+	transaction.category = category;
+	transaction.amount = amount;
+
+	await transaction.save();
+
+	res.status(200).json({ message: "Successfully updated!" });
+});
+
 export {
 	addTransaction,
 	getTransaction,
 	classifyTransaction,
 	deleteTransaction,
+	editTransaction,
 };

@@ -4,6 +4,7 @@ import {
 	addTransaction,
 	classifyTransaction,
 	deleteTransaction,
+	editTransaction,
 	getTransaction,
 } from "../controllers/transactionController";
 dotenv.config();
@@ -15,5 +16,6 @@ router.post("/add", authUser, addTransaction);
 router.get("/get", authUser, getTransaction);
 router.post("/classify", authUser, classifyTransaction);
 router.delete("/delete", authUser, deleteTransaction);
+router.put("/edit", authUser, editTransaction);
 
 module.exports = router;
