@@ -3,6 +3,14 @@ import asyncHandler from "express-async-handler";
 import Transaction from "../models/transactionModel";
 import mongoose from "mongoose";
 import axios from "axios";
+import { OpenAIApi, Configuration, ChatCompletionRequestMessage } from "openai";
+
+const configuration = new Configuration({
+	apiKey: process.env.OPENAI_API_KEY || "",
+});
+
+const openai = new OpenAIApi(configuration);
+
 interface RequestWithUser extends Request {
 	user: mongoose.Document | null;
 }
@@ -157,10 +165,124 @@ const editTransaction = asyncHandler(async (req: Request, res: Response) => {
 	res.status(200).json({ message: "Successfully updated!" });
 });
 
+// ------------------------
+
+function isThisWeek(date: Date) {
+	const now = new Date();
+	const day = now.getUTCDay() || 7; // Make Sunday 7 instead of 0
+	now.setUTCDate(now.getUTCDate() + 4 - day); // Get Thursday of this week
+	const startOfWeek = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 3)
+	); // Get Monday of this week
+	const endOfWeek = new Date(
+		Date.UTC(
+			now.getUTCFullYear(),
+			now.getUTCMonth(),
+			now.getUTCDate() + 3,
+			23,
+			59,
+			59,
+			999
+		)
+	); // Get Sunday of this week
+	return date >= startOfWeek && date <= endOfWeek;
+}
+
+function isLastWeek(date: Date) {
+	const now = new Date();
+	const day = now.getUTCDay() || 7; // Make Sunday 7 instead of 0
+	now.setUTCDate(now.getUTCDate() + 4 - day); // Get Thursday of this week
+	const startOfLastWeek = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 10)
+	); // Get Monday of last week
+	const endOfLastWeek = new Date(
+		Date.UTC(
+			now.getUTCFullYear(),
+			now.getUTCMonth(),
+			now.getUTCDate() - 4,
+			23,
+			59,
+			59,
+			999
+		)
+	); // Get Sunday of last week
+	return date >= startOfLastWeek && date <= endOfLastWeek;
+}
+
+// Desc: get transactions
+// Route : /api/transactions/twoweeks
+// access : private
+const getTwoWeeksTransaction = async (userId: string) => {
+	//get all transactions
+	const transactions = await Transaction.find({
+		userId: userId,
+	});
+
+	// Filter transactions from this week and last week
+	const twoWeeksTransactions = transactions.filter(
+		(transaction) =>
+			isLastWeek(new Date(transaction.createdAt)) ||
+			isThisWeek(new Date(transaction.createdAt))
+	);
+
+	// Send transactions in response
+	return twoWeeksTransactions;
+};
+
+type SpendingData = {
+	userId: mongoose.Types.ObjectId;
+	name?: string | undefined;
+	item?: string | undefined;
+	category?: string | undefined;
+	amount?: number | undefined;
+	createdAt: Date;
+};
+function convertToHumanReadableFormat(data: SpendingData[]) {
+	return data.map((record) => {
+		const date = new Date(record.createdAt).toLocaleDateString();
+		return `On ${date}, you spent ${record.amount} yen on ${record.item} at ${record.name}. This was categorized as ${record.category}.`;
+	});
+}
+
+const analyzeAndRecommend = asyncHandler(
+	async (req: Request, res: Response) => {
+		const userId = (req as RequestWithUser).user?._id;
+		// const userId = "64739c6a258d1f14556c37e8";
+		const data = await getTwoWeeksTransaction(userId);
+		const text = convertToHumanReadableFormat(data);
+
+		// Prepare the messages for the API request
+		const messages: ChatCompletionRequestMessage[] = [
+			{
+				role: "system",
+				content:
+					"You are a helpful personal finance assistant for students that provides spending recommendations for students. Analyze the spending data and provide recommendations on how to save money  and improve spending habits. Consider aspects like too much spending on certain categories, reduce spending on not primary stuffs, exploring cheaper options, and find alternatives to replace too much spending. Lastly, make it concise.",
+			},
+			{
+				role: "user",
+				content: text.join("\n"),
+			},
+		];
+
+		// Make the API request
+		const response = await openai.createChatCompletion({
+			model: "gpt-3.5-turbo",
+			messages: messages,
+			max_tokens: 400,
+		});
+
+		// Extract the assistant's reply from the response
+		const assistantReply = response.data;
+
+		res.status(200).json(assistantReply.choices[0].message?.content);
+	}
+);
+
 export {
 	addTransaction,
 	getTransaction,
 	classifyTransaction,
 	deleteTransaction,
 	editTransaction,
+	analyzeAndRecommend,
 };
