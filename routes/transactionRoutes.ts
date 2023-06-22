@@ -6,6 +6,7 @@ import {
 	classifyTransaction,
 	deleteTransaction,
 	editTransaction,
+	getPrediction,
 	getTransaction,
 } from "../controllers/transactionController";
 dotenv.config();
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post("/add", authUser, addTransaction);
 router.get("/get", authUser, getTransaction);
 router.get("/recommend", authUser, analyzeAndRecommend);
+router.get("/predict", authUser, getPrediction);
 // router.get("/gettwoweeks", authUser, getTwoWeeksTransaction);
 router.post("/classify", authUser, classifyTransaction);
 router.delete("/delete", authUser, deleteTransaction);

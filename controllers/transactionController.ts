@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import Transaction from "../models/transactionModel";
+import User from "../models/userModel";
 import mongoose from "mongoose";
 import axios from "axios";
 import { OpenAIApi, Configuration, ChatCompletionRequestMessage } from "openai";
@@ -11,7 +12,7 @@ const configuration = new Configuration({
 
 const openai = new OpenAIApi(configuration);
 
-interface RequestWithUser extends Request {
+export interface RequestWithUser extends Request {
 	user: mongoose.Document | null;
 }
 
@@ -278,6 +279,43 @@ const analyzeAndRecommend = asyncHandler(
 	}
 );
 
+// Desc: get transactions
+// Route : /api/transactions/getprediction
+// access : private
+const getPrediction = asyncHandler(async (req: Request, res: Response) => {
+	//get all transactions
+	const transactions = await Transaction.find({
+		userId: (req as RequestWithUser).user?._id,
+	});
+
+	const user = await User.findById((req as RequestWithUser).user?._id);
+
+	// get today
+	const currentDayOfWeek = new Date().getDay();
+
+	const transactionsToday = transactions.filter((transaction) => {
+		const transactionDayOfWeek = new Date(transaction.createdAt).getDay();
+		return transactionDayOfWeek === currentDayOfWeek;
+	});
+
+	const config = {
+		method: "post",
+		url: process.env.ML_URL + "api/predict",
+		headers: {},
+		data: {
+			transactions: transactionsToday,
+			day: currentDayOfWeek,
+			budget: user?.weeklyBudget,
+		},
+	};
+
+	const response = await axios(config);
+	// console.log(response.data);
+
+	// Send transactions in response
+	res.json(response.data);
+});
+
 export {
 	addTransaction,
 	getTransaction,
@@ -285,4 +323,5 @@ export {
 	deleteTransaction,
 	editTransaction,
 	analyzeAndRecommend,
+	getPrediction,
 };

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/userModel";
 import dotenv from "dotenv";
+import { RequestWithUser } from "./transactionController";
 dotenv.config();
 
 //Generate token
@@ -30,6 +31,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 			name: user.name,
 			email: user.email,
 			picture: user.picture,
+			weeklyBudget: user.weeklyBudget,
 			token: generateToken(user._id),
 		});
 	} else {
@@ -71,6 +73,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 			name: user.name,
 			email: user.email,
 			picture: user.picture,
+			weeklyBudget: user.weeklyBudget,
 			token: generateToken(user._id),
 		});
 	}
@@ -99,6 +102,7 @@ const googleSignIn = asyncHandler(
 				name: userExist.name,
 				email: userExist.email,
 				picture: userExist.picture,
+				weeklyBudget: userExist.weeklyBudget,
 				token: generateToken(userExist._id),
 			});
 		} else {
@@ -115,6 +119,7 @@ const googleSignIn = asyncHandler(
 					name: user.name,
 					email: user.email,
 					picture: user.picture,
+					weeklyBudget: user.weeklyBudget,
 					token: generateToken(user._id),
 				});
 			}
@@ -173,4 +178,55 @@ const setPassword = asyncHandler(async (req: Request, res: Response) => {
 	}
 });
 
-export { registerUser, loginUser, googleSignIn, checkPassword, setPassword };
+const setWeeklyBudget = asyncHandler(async (req: Request, res: Response) => {
+	const { weeklyBudget } = req.body;
+
+	const user = await User.findById((req as RequestWithUser).user?._id);
+
+	if (user) {
+		user.weeklyBudget = weeklyBudget;
+		await user.save();
+		res.status(200).json({ message: "Weekly budget is successfully updated" });
+	}
+});
+
+const getWeeklyBudget = asyncHandler(async (req: Request, res: Response) => {
+	const user: any = await User.findById((req as RequestWithUser).user?._id);
+
+	res.status(200).json({ weeklyBudget: user.weeklyBudget });
+});
+
+const savePrediction = asyncHandler(async (req: Request, res: Response) => {
+	const { weeklyPrediction } = req.body;
+	const user = await User.findById((req as RequestWithUser).user?._id);
+
+	// console.log(weeklyPrediction);
+
+	if (user) {
+		user.weeklyPrediction = weeklyPrediction;
+		await user.save();
+		res
+			.status(200)
+			.json({ message: "Weekly prediction is successfully updated" });
+	}
+});
+
+const getWeeklyPrediction = asyncHandler(
+	async (req: Request, res: Response) => {
+		const user = await User.findById((req as RequestWithUser).user?._id);
+
+		res.status(200).json({ weeklyPrediction: user?.weeklyPrediction });
+	}
+);
+
+export {
+	registerUser,
+	loginUser,
+	googleSignIn,
+	checkPassword,
+	setPassword,
+	setWeeklyBudget,
+	getWeeklyBudget,
+	savePrediction,
+	getWeeklyPrediction,
+};
