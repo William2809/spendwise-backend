@@ -200,8 +200,6 @@ const savePrediction = asyncHandler(async (req: Request, res: Response) => {
 	const { weeklyPrediction } = req.body;
 	const user = await User.findById((req as RequestWithUser).user?._id);
 
-	// console.log(weeklyPrediction);
-
 	if (user) {
 		user.weeklyPrediction = weeklyPrediction;
 		await user.save();

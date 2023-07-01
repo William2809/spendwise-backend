@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import Transaction from "../models/transactionModel";
+import dailyTransaction from "../models/dailyTransactionModel";
 import User from "../models/userModel";
 import mongoose from "mongoose";
 import axios from "axios";
@@ -284,17 +285,17 @@ const analyzeAndRecommend = asyncHandler(
 // access : private
 const getPrediction = asyncHandler(async (req: Request, res: Response) => {
 	//get all transactions
-	const transactions = await Transaction.find({
-		userId: (req as RequestWithUser).user?._id,
-	});
+	const userId = (req as RequestWithUser).user?._id;
 
-	const user = await User.findById((req as RequestWithUser).user?._id);
+	const dailyTransactions = await dailyTransaction.find({ userId });
+
+	const user = await User.findById(userId);
 
 	// get today
-	const currentDayOfWeek = new Date().getDay();
-
-	const transactionsToday = transactions.filter((transaction) => {
-		const transactionDayOfWeek = new Date(transaction.createdAt).getDay();
+	const currentDayOfWeek = new Date().getDay() - 1;
+	console.log(currentDayOfWeek);
+	const transactionsToday = dailyTransactions.filter((transaction) => {
+		const transactionDayOfWeek = transaction.numberOfDay;
 		return transactionDayOfWeek === currentDayOfWeek;
 	});
 
@@ -310,11 +311,120 @@ const getPrediction = asyncHandler(async (req: Request, res: Response) => {
 	};
 
 	const response = await axios(config);
-	// console.log(response.data);
-
 	// Send transactions in response
+
 	res.json(response.data);
 });
+
+const updateAllPredictions = async (userId: string) => {
+	//get all transactions
+	const dailyTransactions = await dailyTransaction.find({ userId });
+
+	const user = await User.findById(userId);
+
+	const weeklyPrediction: number[] = [];
+
+	for (let i = 0; i < 7; i++) {
+		const currentDayOfWeek = i;
+
+		const transactionsToday = dailyTransactions.filter((transaction) => {
+			const transactionDayOfWeek = transaction.numberOfDay;
+			return transactionDayOfWeek === currentDayOfWeek;
+		});
+
+		const config = {
+			method: "post",
+			url: process.env.ML_URL + "api/predict",
+			headers: {},
+			data: {
+				transactions: transactionsToday,
+				day: currentDayOfWeek,
+				budget: user?.weeklyBudget,
+			},
+		};
+
+		const response = await axios(config);
+
+		weeklyPrediction[i] = response.data.prediction;
+	}
+
+	return weeklyPrediction;
+};
+
+const deleteAllDailyTransactionsForUser = async (
+	userId: mongoose.Types.ObjectId
+) => {
+	await dailyTransaction.deleteMany({ userId: userId });
+};
+
+const requestUpdateDailyTransaction = asyncHandler(
+	async (req: Request, res: Response) => {
+		const userId = (req as RequestWithUser).user?._id;
+		try {
+			//call update daily transaction
+			await updateDailyTransaction(userId);
+			const prediction = await updateAllPredictions(userId);
+			res.json({ message: "Update success", prediction });
+		} catch (err) {
+			res.status(500).json({ message: err });
+		}
+	}
+);
+
+const requestDeleteDailyTransaction = asyncHandler(
+	async (req: Request, res: Response) => {
+		const userId = (req as RequestWithUser).user?._id;
+		try {
+			//call update daily transaction
+			await deleteAllDailyTransactionsForUser(userId);
+			res.json({ message: "Delete success" });
+		} catch (err) {
+			res.status(500).json({ message: err });
+		}
+	}
+);
+
+const updateDailyTransaction = async (userId: string) => {
+	// Find all transactions for this user
+	const transactions = await Transaction.aggregate([
+		{
+			$match: {
+				userId: new mongoose.Types.ObjectId(userId),
+			},
+		},
+		{
+			$group: {
+				_id: {
+					date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+				},
+				totalAmount: { $sum: "$amount" },
+			},
+		},
+	]);
+
+	// Go through each of the transactions
+	for (let transaction of transactions) {
+		// Create a date from the transaction date parts
+		const date = new Date(transaction._id.date);
+
+		// Prepare the daily transaction entry
+		const DailyTransaction = {
+			userId: userId,
+			numberOfDay: (date.getDay() - 1 + 7) % 7,
+			amount: transaction.totalAmount,
+			date: date,
+		};
+
+		// Update the entry in the database, or create it if it doesn't exist
+		await dailyTransaction.updateOne(
+			{ userId: userId, date: date },
+			DailyTransaction,
+			{
+				upsert: true,
+			}
+		);
+	}
+};
 
 export {
 	addTransaction,
@@ -324,4 +434,6 @@ export {
 	editTransaction,
 	analyzeAndRecommend,
 	getPrediction,
+	requestUpdateDailyTransaction,
+	requestDeleteDailyTransaction,
 };
